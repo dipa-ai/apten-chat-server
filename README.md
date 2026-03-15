@@ -1,0 +1,143 @@
+# Family Messenger Backend
+
+Private, invite-only messenger backend written in Go. This repository contains the API server only: REST endpoints for account and chat management, a WebSocket endpoint for real-time events, PostgreSQL storage, S3-compatible file uploads, and optional web push support.
+
+## Features
+
+- Invite-based registration with admin bootstrap for the first user
+- JWT access and refresh tokens
+- Direct and group chats
+- Real-time messaging over WebSocket
+- Typing indicators, presence updates, and read receipts
+- File uploads with S3 or MinIO-backed storage
+- Image thumbnail generation
+- Optional web push subscriptions via VAPID
+
+## Project Layout
+
+- `cmd/server`: application entry point and router setup
+- `internal/auth`: JWT, password hashing, auth middleware
+- `internal/chat`, `internal/message`, `internal/user`, `internal/invite`, `internal/files`, `internal/push`, `internal/ws`: domain logic and HTTP handlers
+- `internal/db/queries`: handwritten SQL used by `sqlc`
+- `internal/db/dbq`: generated query code
+- `migrations`: Goose SQL migrations embedded into the binary
+- `k8s`: Kubernetes manifests
+- `docker-compose.yml`: local Postgres and MinIO stack
+
+## Requirements
+
+- Go toolchain compatible with `go.mod` (currently `go1.25`)
+- Docker with Compose for local dependencies
+
+## Quick Start
+
+1. Start local infrastructure:
+
+   ```sh
+   make docker-up
+   ```
+
+2. Create a local env file and load it into your shell. The server reads process environment variables directly; it does not auto-load `.env`.
+
+   ```sh
+   cp .env.example .env
+   set -a
+   source .env
+   set +a
+   ```
+
+3. Start the API:
+
+   ```sh
+   make run
+   ```
+
+4. On the first startup with an empty database, the server logs a bootstrap invite code. Use that code to create the first account; the first registered user becomes an admin automatically.
+
+5. Check the service:
+
+   ```sh
+   curl http://localhost:8080/api/health
+   ```
+
+The server runs embedded database migrations automatically at startup.
+
+## Common Commands
+
+- `make run`: start the API server
+- `make test`: run `go test ./...`
+- `make docker-up`: start Postgres and MinIO
+- `make docker-down`: stop local containers
+- `make migrate-up`: apply migrations manually with Goose
+- `make migrate-down`: roll back the latest migration
+- `make migrate-create NAME=add_feature`: create a new SQL migration
+- `make sqlc-generate`: regenerate `internal/db/dbq` from SQL files
+
+## Configuration
+
+Key environment variables:
+
+- `SERVER_PORT`: HTTP port, default `8080`
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: required signing secret for access tokens
+- `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`: token lifetimes
+- `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`: object storage configuration
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: S3 or MinIO credentials
+- `FILE_MAX_SIZE`: max upload size in bytes
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CONTACT`: push notification settings
+- `INVITE_TTL`: invite expiration window
+
+The local Compose stack starts PostgreSQL on `localhost:5432`, MinIO on `localhost:9000`, and creates the `messenger-files` bucket automatically.
+
+## API Overview
+
+Public REST endpoints:
+
+- `POST /api/register`
+- `POST /api/login`
+- `POST /api/refresh`
+
+Authenticated REST endpoints:
+
+- `GET /api/users/me`, `PUT /api/users/me`, `GET /api/users`
+- `GET /api/chats`, `POST /api/chats`, `GET /api/chats/{id}`, `PUT /api/chats/{id}`
+- `POST /api/chats/{id}/members`, `DELETE /api/chats/{id}/members/{uid}`
+- `GET /api/chats/{id}/messages`, `GET /api/chats/{id}/messages/{mid}`
+- `PUT /api/chats/{id}/messages/{mid}`, `DELETE /api/chats/{id}/messages/{mid}`
+- `POST /api/chats/{id}/upload`
+- `GET /api/files/{fileID}`, `GET /api/files/{fileID}/thumb`
+- `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `GET /api/push/vapid-key`
+
+Admin-only endpoints:
+
+- `POST /api/invites`
+- `GET /api/invites`
+- `DELETE /api/invites/{id}`
+
+WebSocket endpoint:
+
+- `GET /api/ws?token=<access-token>`
+
+Client events include `message.send`, `typing.start`, `typing.stop`, and `message.read`. New text messages are created over WebSocket; file-only messages are created through `POST /api/chats/{id}/upload`.
+`POST /api/chats/{id}/upload` expects `multipart/form-data` with a `file` field.
+
+Example registration request:
+
+```sh
+curl -X POST http://localhost:8080/api/register \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"<invite>","username":"alex","display_name":"Alex","password":"secret123"}'
+```
+
+Example WebSocket event:
+
+```json
+{"type":"message.send","payload":{"chat_id":1,"content":"hello","client_id":"msg-1"}}
+```
+
+## Development Notes
+
+- Edit SQL in `internal/db/queries`, then run `make sqlc-generate`
+- Do not hand-edit files in `internal/db/dbq`
+- Keep schema changes in `migrations`
+- Use the manifests in `k8s/` for cluster deployment work

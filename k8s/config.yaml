@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: messenger-config
+data:
+  SERVER_PORT: "8080"
+  S3_BUCKET: "messenger-files"
+  S3_REGION: "eu-central-1"
+  INVITE_TTL: "168h"
+  JWT_ACCESS_TTL: "15m"
+  JWT_REFRESH_TTL: "720h"
+  FILE_MAX_SIZE: "52428800"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: messenger-secrets
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://messenger:CHANGE_ME@messenger-db:5432/messenger?sslmode=disable"
+  JWT_SECRET: "CHANGE_ME"
+  AWS_ACCESS_KEY_ID: "CHANGE_ME"
+  AWS_SECRET_ACCESS_KEY: "CHANGE_ME"
+  VAPID_PUBLIC_KEY: ""
+  VAPID_PRIVATE_KEY: ""
+  VAPID_CONTACT: "mailto:admin@example.com"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: messenger-db-secrets
+type: Opaque
+stringData:
+  POSTGRES_USER: "messenger"
+  POSTGRES_PASSWORD: "CHANGE_ME"
+  POSTGRES_DB: "messenger"
