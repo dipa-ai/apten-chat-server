@@ -16,14 +16,14 @@ type HubChecker interface {
 }
 
 type Service struct {
-	queries    *dbq.Queries
+	queries    dbq.Querier
 	hubChecker HubChecker
 	vapidPub   string
 	vapidPriv  string
 	contact    string
 }
 
-func NewService(queries *dbq.Queries, hubChecker HubChecker, vapidPub, vapidPriv, contact string) *Service {
+func NewService(queries dbq.Querier, hubChecker HubChecker, vapidPub, vapidPriv, contact string) *Service {
 	return &Service{
 		queries:    queries,
 		hubChecker: hubChecker,

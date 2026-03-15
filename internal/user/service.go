@@ -20,8 +20,9 @@ var (
 )
 
 type Service struct {
-	pool       *pgxpool.Pool
-	queries    *dbq.Queries
+	queries    dbq.Querier
+	beginTx    func(ctx context.Context) (pgx.Tx, error)
+	withTx     func(tx pgx.Tx) dbq.Querier
 	jwtSecret  string
 	accessTTL  time.Duration
 	refreshTTL time.Duration
@@ -34,8 +35,21 @@ type TokenPair struct {
 
 func NewService(pool *pgxpool.Pool, queries *dbq.Queries, jwtSecret string, accessTTL, refreshTTL time.Duration) *Service {
 	return &Service{
-		pool:       pool,
 		queries:    queries,
+		beginTx:    func(ctx context.Context) (pgx.Tx, error) { return pool.Begin(ctx) },
+		withTx:     func(tx pgx.Tx) dbq.Querier { return queries.WithTx(tx) },
+		jwtSecret:  jwtSecret,
+		accessTTL:  accessTTL,
+		refreshTTL: refreshTTL,
+	}
+}
+
+// NewServiceWithDeps creates a Service with explicit dependencies (for testing).
+func NewServiceWithDeps(queries dbq.Querier, beginTx func(ctx context.Context) (pgx.Tx, error), withTx func(tx pgx.Tx) dbq.Querier, jwtSecret string, accessTTL, refreshTTL time.Duration) *Service {
+	return &Service{
+		queries:    queries,
+		beginTx:    beginTx,
+		withTx:     withTx,
 		jwtSecret:  jwtSecret,
 		accessTTL:  accessTTL,
 		refreshTTL: refreshTTL,
@@ -62,13 +76,13 @@ func (s *Service) Register(ctx context.Context, code, username, displayName, pas
 	}
 	isAdmin := count == 0
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.beginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := s.queries.WithTx(tx)
+	qtx := s.withTx(tx)
 
 	user, err := qtx.CreateUser(ctx, dbq.CreateUserParams{
 		Username:     username,

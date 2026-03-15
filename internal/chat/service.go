@@ -17,12 +17,22 @@ var (
 )
 
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *dbq.Queries
+	queries dbq.Querier
+	beginTx func(ctx context.Context) (pgx.Tx, error)
+	withTx  func(tx pgx.Tx) dbq.Querier
 }
 
 func NewService(pool *pgxpool.Pool, queries *dbq.Queries) *Service {
-	return &Service{pool: pool, queries: queries}
+	return &Service{
+		queries: queries,
+		beginTx: func(ctx context.Context) (pgx.Tx, error) { return pool.Begin(ctx) },
+		withTx:  func(tx pgx.Tx) dbq.Querier { return queries.WithTx(tx) },
+	}
+}
+
+// NewServiceWithDeps creates a Service with explicit dependencies (for testing).
+func NewServiceWithDeps(queries dbq.Querier, beginTx func(ctx context.Context) (pgx.Tx, error), withTx func(tx pgx.Tx) dbq.Querier) *Service {
+	return &Service{queries: queries, beginTx: beginTx, withTx: withTx}
 }
 
 type CreateRequest struct {
@@ -46,13 +56,13 @@ func (s *Service) Create(ctx context.Context, creatorID int64, req CreateRequest
 		}
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.beginTx(ctx)
 	if err != nil {
 		return dbq.Chat{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := s.queries.WithTx(tx)
+	qtx := s.withTx(tx)
 
 	var name pgtype.Text
 	if req.Name != nil {

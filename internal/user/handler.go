@@ -12,10 +12,10 @@ import (
 
 type Handler struct {
 	service *Service
-	queries *dbq.Queries
+	queries dbq.Querier
 }
 
-func NewHandler(service *Service, queries *dbq.Queries) *Handler {
+func NewHandler(service *Service, queries dbq.Querier) *Handler {
 	return &Handler{service: service, queries: queries}
 }
 

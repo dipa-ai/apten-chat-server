@@ -23,14 +23,14 @@ type Handler struct {
 	hub            *Hub
 	chatService    *chat.Service
 	messageService *message.Service
-	queries        *dbq.Queries
+	queries        dbq.Querier
 	jwtSecret      string
 
 	typingTimers map[typingKey]*time.Timer
 	typingMu     sync.Mutex
 }
 
-func NewHandler(hub *Hub, chatService *chat.Service, messageService *message.Service, queries *dbq.Queries, jwtSecret string) *Handler {
+func NewHandler(hub *Hub, chatService *chat.Service, messageService *message.Service, queries dbq.Querier, jwtSecret string) *Handler {
 	return &Handler{
 		hub:            hub,
 		chatService:    chatService,

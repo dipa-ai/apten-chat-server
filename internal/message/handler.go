@@ -21,11 +21,11 @@ type Broadcaster interface {
 type Handler struct {
 	service     *Service
 	chatService *chat.Service
-	queries     *dbq.Queries
+	queries     dbq.Querier
 	broadcaster Broadcaster
 }
 
-func NewHandler(service *Service, chatService *chat.Service, queries *dbq.Queries, broadcaster Broadcaster) *Handler {
+func NewHandler(service *Service, chatService *chat.Service, queries dbq.Querier, broadcaster Broadcaster) *Handler {
 	return &Handler{service: service, chatService: chatService, queries: queries, broadcaster: broadcaster}
 }
 

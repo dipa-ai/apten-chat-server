@@ -11,11 +11,11 @@ import (
 )
 
 type Service struct {
-	queries   *dbq.Queries
+	queries   dbq.Querier
 	inviteTTL time.Duration
 }
 
-func NewService(queries *dbq.Queries, inviteTTL time.Duration) *Service {
+func NewService(queries dbq.Querier, inviteTTL time.Duration) *Service {
 	return &Service{queries: queries, inviteTTL: inviteTTL}
 }
 
@@ -41,7 +41,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 }
 
 // Bootstrap creates a seed invite when no users exist (created_by = NULL).
-func Bootstrap(ctx context.Context, queries *dbq.Queries, ttl time.Duration) (string, error) {
+func Bootstrap(ctx context.Context, queries dbq.Querier, ttl time.Duration) (string, error) {
 	code, err := generateCode()
 	if err != nil {
 		return "", err

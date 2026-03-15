@@ -8,10 +8,10 @@ import (
 
 type contextKey string
 
-const claimsKey contextKey = "claims"
+const ClaimsKey contextKey = "claims"
 
 func GetClaims(ctx context.Context) *Claims {
-	claims, _ := ctx.Value(claimsKey).(*Claims)
+	claims, _ := ctx.Value(ClaimsKey).(*Claims)
 	return claims
 }
 
@@ -31,7 +31,7 @@ func Middleware(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), claimsKey, claims)
+			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

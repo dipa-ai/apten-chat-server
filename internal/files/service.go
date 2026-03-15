@@ -33,11 +33,11 @@ var imageTypes = map[string]bool{
 
 type Service struct {
 	s3      *S3Client
-	queries *dbq.Queries
+	queries dbq.Querier
 	maxSize int64
 }
 
-func NewService(s3 *S3Client, queries *dbq.Queries, maxSize int64) *Service {
+func NewService(s3 *S3Client, queries dbq.Querier, maxSize int64) *Service {
 	return &Service{s3: s3, queries: queries, maxSize: maxSize}
 }
 
