@@ -57,10 +57,10 @@ jobs:
 
       - name: Package Helm chart
         run: |
-          helm dependency update install/kubernetes/apten-chat-server
-          helm package install/kubernetes/apten-chat-server \
+          helm dependency update install/kubernetes/chart
+          helm package install/kubernetes/chart \
             --version "${CHART_VERSION#v}" \
             --app-version "${CHART_VERSION}"
 
       - name: Push Helm chart to OCI registry
-        run: helm push aptenbot-${CHART_VERSION#v}.tgz oci://${{ vars.DOCKER_REGISTRY }}/59508-197526-76-infra/charts
+        run: helm push apten-chat-server-${CHART_VERSION#v}.tgz oci://${{ vars.DOCKER_REGISTRY }}/59508-197526-76-infra/charts

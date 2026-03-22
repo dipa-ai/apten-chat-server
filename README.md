@@ -1,4 +1,4 @@
-# Family Messenger Backend
+# Apten Chat Server
 
 Private, invite-only messenger backend written in Go. This repository contains the API server only: REST endpoints for account and chat management, a WebSocket endpoint for real-time events, PostgreSQL storage, S3-compatible file uploads, and optional web push support.
 
@@ -21,7 +21,8 @@ Private, invite-only messenger backend written in Go. This repository contains t
 - `internal/db/queries`: handwritten SQL used by `sqlc`
 - `internal/db/dbq`: generated query code
 - `migrations`: Goose SQL migrations embedded into the binary
-- `k8s`: Kubernetes manifests
+- `k8s`: raw Kubernetes manifests (reference)
+- `install/kubernetes/chart`: Helm chart for deployment
 - `docker-compose.yml`: local Postgres and MinIO stack
 
 ## Requirements

@@ -1,0 +1,42 @@
+# Backend values for apten-chat
+
+name: apten-chat-server
+
+replicaCount: 1
+
+image:
+  repository: registry.luxembourg-2.cloud.gcore.dev/59508-197526-76-infra/apten-chat-server
+  tag: "v0.0.1"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: registry-secret
+
+# Service configuration
+service:
+  port: 80
+  targetPort: 8080
+
+# Secrets (injected via envFrom, managed by ExternalSecrets in infra repo)
+secrets:
+  - apten-chat-server-secret
+
+# Static config (injected via envFrom as ConfigMap)
+config:
+  SERVER_PORT: "8080"
+  JWT_ACCESS_TTL: "15m"
+  JWT_REFRESH_TTL: "720h"
+  S3_BUCKET: "messenger-files"
+  S3_REGION: "eu-central-1"
+  FILE_MAX_SIZE: "52428800"
+  INVITE_TTL: "168h"
+  VAPID_CONTACT: "mailto:admin@apten.im"
+
+# Resources
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

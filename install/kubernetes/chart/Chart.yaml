@@ -1,0 +1,12 @@
+apiVersion: v2
+name: apten-chat-server
+description: Backend API for apten-chat messenger
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+keywords:
+  - chat
+  - backend
+  - api
+maintainers:
+  - name: Alex
