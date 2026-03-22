@@ -26,11 +26,10 @@ config:
   SERVER_PORT: "8080"
   JWT_ACCESS_TTL: "15m"
   JWT_REFRESH_TTL: "720h"
-  S3_BUCKET: "messenger-files"
-  S3_REGION: "eu-central-1"
+  S3_BUCKET: "apten-chat"
   FILE_MAX_SIZE: "52428800"
   INVITE_TTL: "168h"
-  VAPID_CONTACT: "mailto:admin@apten.im"
+  VAPID_CONTACT: "mailto:zhivoysp@gmail.com"
 
 # Resources
 resources:
