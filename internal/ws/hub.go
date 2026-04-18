@@ -77,6 +77,9 @@ func (h *Hub) Run() {
 }
 
 // Send sends an event to all connections for the given user IDs.
+// If a client's send buffer is full, the client is disconnected; the
+// read pump will then re-register after the client reconnects, forcing
+// a fresh sync instead of silently dropping real-time state.
 func (h *Hub) Send(userIDs []int64, evt Event) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -86,14 +89,17 @@ func (h *Hub) Send(userIDs []int64, evt Event) {
 				select {
 				case client.Send <- evt:
 				default:
-					log.Printf("ws: dropping message for user %d (buffer full)", uid)
+					log.Printf("ws: buffer full for user %d, disconnecting", uid)
+					client.Disconnect()
 				}
 			}
 		}
 	}
 }
 
-// BroadcastAll sends an event to every connected client.
+// BroadcastAll sends an event to every connected client. Presence
+// updates are lossier by nature; we still disconnect slow clients so
+// they re-sync on reconnect.
 func (h *Hub) BroadcastAll(evt Event) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -102,6 +108,7 @@ func (h *Hub) BroadcastAll(evt Event) {
 			select {
 			case client.Send <- evt:
 			default:
+				client.Disconnect()
 			}
 		}
 	}

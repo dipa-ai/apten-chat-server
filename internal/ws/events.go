@@ -48,6 +48,13 @@ type MessageAckPayload struct {
 	MessageID int64  `json:"message_id"`
 }
 
+// MessageErrorPayload is sent back to the sender when a message.send
+// event cannot be delivered (rate limit, permissions, persistence error).
+type MessageErrorPayload struct {
+	ClientID string `json:"client_id"`
+	Reason   string `json:"reason"`
+}
+
 type TypingUpdatePayload struct {
 	ChatID   int64 `json:"chat_id"`
 	UserID   int64 `json:"user_id"`

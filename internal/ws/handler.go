@@ -87,16 +87,19 @@ func (h *Handler) handleEvent(client *Client, evt Event) {
 func (h *Handler) handleMessageSend(client *Client, payload json.RawMessage) {
 	var p MessageSendPayload
 	if err := json.Unmarshal(payload, &p); err != nil {
+		log.Printf("ws: message send unmarshal error: %v", err)
 		return
 	}
 
 	if err := h.chatService.EnsureMember(client.ctx, p.ChatID, client.UserID); err != nil {
+		client.sendError(p.ClientID, "forbidden")
 		return
 	}
 
 	msg, err := h.messageService.Send(client.ctx, p.ChatID, client.UserID, p.Content, p.ReplyToID)
 	if err != nil {
 		log.Printf("ws: message send error: %v", err)
+		client.sendError(p.ClientID, "send_failed")
 		return
 	}
 
@@ -104,11 +107,13 @@ func (h *Handler) handleMessageSend(client *Client, payload json.RawMessage) {
 	fullMsg, err := h.messageService.GetByID(client.ctx, msg.ID)
 	if err != nil {
 		log.Printf("ws: get message error: %v", err)
+		client.sendError(p.ClientID, "internal")
 		return
 	}
 
 	memberIDs, err := h.chatService.GetMemberIDs(client.ctx, p.ChatID)
 	if err != nil {
+		client.sendError(p.ClientID, "internal")
 		return
 	}
 
