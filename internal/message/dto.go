@@ -34,6 +34,7 @@ type MessageDTO struct {
 	ReplyToID         *int64          `json:"reply_to_id"`
 	CreatedAt         time.Time       `json:"created_at"`
 	UpdatedAt         *time.Time      `json:"updated_at"`
+	DeletedAt         *time.Time      `json:"deleted_at"`
 	Attachments       []AttachmentDTO `json:"attachments"`
 }
 
@@ -82,7 +83,7 @@ func buildMessageDTO(
 	senderUsername, senderDisplayName string,
 	content pgtype.Text,
 	replyToID pgtype.Int8,
-	createdAt, updatedAt pgtype.Timestamptz,
+	createdAt, updatedAt, deletedAt pgtype.Timestamptz,
 	atts []AttachmentDTO,
 ) MessageDTO {
 	if atts == nil {
@@ -98,6 +99,7 @@ func buildMessageDTO(
 		ReplyToID:         int8Ptr(replyToID),
 		CreatedAt:         createdAt.Time,
 		UpdatedAt:         timestamptzPtr(updatedAt),
+		DeletedAt:         timestamptzPtr(deletedAt),
 		Attachments:       atts,
 	}
 }

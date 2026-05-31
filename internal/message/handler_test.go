@@ -16,6 +16,73 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// captureBroadcaster records the most recent SendJSON call so tests can
+// assert on the event type and payload that members would receive.
+type captureBroadcaster struct {
+	userIDs   []int64
+	eventType string
+	payload   any
+	calls     int
+}
+
+func (c *captureBroadcaster) SendJSON(userIDs []int64, eventType string, payload any) {
+	c.calls++
+	c.userIDs = userIDs
+	c.eventType = eventType
+	c.payload = payload
+}
+
+// Deleting a message must soft-delete it (SoftDeleteMessage) and broadcast a
+// message.deleted event carrying the message ID and chat ID to the members.
+func TestDeleteMessage_BroadcastsDeletion(t *testing.T) {
+	softDeleted := int64(0)
+	mock := &testutil.MockQuerier{
+		IsChatMemberFunc: func(ctx context.Context, arg dbq.IsChatMemberParams) (bool, error) {
+			return true, nil
+		},
+		GetMessageByIDFunc: func(ctx context.Context, id int64) (dbq.GetMessageByIDRow, error) {
+			return dbq.GetMessageByIDRow{ID: 123, ChatID: 7, SenderID: 10}, nil
+		},
+		SoftDeleteMessageFunc: func(ctx context.Context, id int64) error {
+			softDeleted = id
+			return nil
+		},
+		ListChatMembersFunc: func(ctx context.Context, chatID int64) ([]dbq.ListChatMembersRow, error) {
+			return []dbq.ListChatMembersRow{{ID: 10}, {ID: 11}}, nil
+		},
+	}
+	bc := &captureBroadcaster{}
+	h := NewHandler(nil, chat.NewServiceWithDeps(mock, nil, nil), mock, bc)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/chats/7/messages/123", nil).
+		WithContext(reqCtx(10, map[string]string{"id": "7", "mid": "123"}))
+	rec := httptest.NewRecorder()
+	h.DeleteMessage(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if softDeleted != 123 {
+		t.Errorf("SoftDeleteMessage called with id=%d, want 123", softDeleted)
+	}
+	if bc.calls != 1 {
+		t.Fatalf("broadcaster called %d times, want 1", bc.calls)
+	}
+	if bc.eventType != "message.deleted" {
+		t.Errorf("event type = %q, want message.deleted", bc.eventType)
+	}
+	p, ok := bc.payload.(map[string]any)
+	if !ok {
+		t.Fatalf("payload type = %T, want map[string]any", bc.payload)
+	}
+	if p["id"] != int64(123) {
+		t.Errorf("payload id = %v, want 123", p["id"])
+	}
+	if p["chat_id"] != int64(7) {
+		t.Errorf("payload chat_id = %v, want 7", p["chat_id"])
+	}
+}
+
 func TestWriteJSON(t *testing.T) {
 	rec := httptest.NewRecorder()
 	writeJSON(rec, http.StatusOK, map[string]string{"status": "ok"})

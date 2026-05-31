@@ -1,17 +1,17 @@
 -- name: CreateMessage :one
 INSERT INTO messages (chat_id, sender_id, content, reply_to_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at;
+RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at, deleted_at;
 
 -- name: GetMessageByID :one
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
 WHERE m.id = $1;
 
 -- name: ListMessagesByChatBefore :many
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
@@ -23,7 +23,7 @@ ORDER BY m.created_at DESC, m.id DESC
 LIMIT $3;
 
 -- name: ListMessagesByChatLatest :many
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
@@ -35,7 +35,11 @@ LIMIT $2;
 UPDATE messages
 SET content = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at;
+RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at, deleted_at;
 
 -- name: SoftDeleteMessage :exec
-UPDATE messages SET content = NULL, updated_at = now() WHERE id = $1;
+UPDATE messages
+SET content = NULL,
+    deleted_at = now(),
+    updated_at = now()
+WHERE id = $1;
