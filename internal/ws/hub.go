@@ -114,10 +114,21 @@ func (h *Hub) SendLocal(userIDs []int64, evt Event) {
 	}
 }
 
-// BroadcastAll sends an event to every connected client. Presence
-// updates are lossier by nature; we still disconnect slow clients so
-// they re-sync on reconnect.
+// BroadcastAll sends an event to every connected client on this instance and,
+// when a broker is configured, to clients on other replicas. Used for presence,
+// which otherwise would only reflect users connected to the same instance.
 func (h *Hub) BroadcastAll(evt Event) {
+	h.BroadcastAllLocal(evt)
+	if h.Broker != nil {
+		h.Broker.PublishBroadcast(context.Background(), evt)
+	}
+}
+
+// BroadcastAllLocal sends an event to every connected client on this instance.
+// The broker's receive loop calls this (not BroadcastAll) so broadcasts from
+// other replicas are not re-published. Presence updates are lossier by nature;
+// we still disconnect slow clients so they re-sync on reconnect.
+func (h *Hub) BroadcastAllLocal(evt Event) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for _, conns := range h.clients {

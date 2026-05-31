@@ -13,7 +13,7 @@ func TestBroker_HandleMessage_FansOutRemoteEvent(t *testing.T) {
 		called++
 		gotUserIDs = userIDs
 		gotEvent = evt
-	})
+	}, func(Event) {})
 
 	payload, _ := json.Marshal(BrokerEvent{
 		Origin:  "instance-B", // a different replica
@@ -35,7 +35,7 @@ func TestBroker_HandleMessage_FansOutRemoteEvent(t *testing.T) {
 
 func TestBroker_HandleMessage_SkipsOwnOrigin(t *testing.T) {
 	called := 0
-	b := NewBroker(nil, "instance-A", func([]int64, Event) { called++ })
+	b := NewBroker(nil, "instance-A", func([]int64, Event) { called++ }, func(Event) { called++ })
 
 	payload, _ := json.Marshal(BrokerEvent{
 		Origin:  "instance-A", // same instance — must be ignored
@@ -51,11 +51,41 @@ func TestBroker_HandleMessage_SkipsOwnOrigin(t *testing.T) {
 
 func TestBroker_HandleMessage_IgnoresMalformed(t *testing.T) {
 	called := 0
-	b := NewBroker(nil, "instance-A", func([]int64, Event) { called++ })
+	b := NewBroker(nil, "instance-A", func([]int64, Event) { called++ }, func(Event) { called++ })
 
 	b.handleMessage([]byte("not json")) // must not panic
 
 	if called != 0 {
 		t.Errorf("onEvent called %d times for malformed payload, want 0", called)
+	}
+}
+
+// A broadcast event (e.g. presence) from another replica must be delivered via
+// onBroadcast, not onEvent.
+func TestBroker_HandleMessage_RoutesBroadcast(t *testing.T) {
+	targeted := 0
+	broadcast := 0
+	b := NewBroker(nil, "instance-A",
+		func([]int64, Event) { targeted++ },
+		func(evt Event) {
+			broadcast++
+			if evt.Type != "presence.update" {
+				t.Errorf("broadcast event type = %q, want presence.update", evt.Type)
+			}
+		},
+	)
+
+	payload, _ := json.Marshal(BrokerEvent{
+		Origin:    "instance-B",
+		Broadcast: true,
+		Event:     Event{Type: "presence.update"},
+	})
+	b.handleMessage(payload)
+
+	if broadcast != 1 {
+		t.Errorf("onBroadcast called %d times, want 1", broadcast)
+	}
+	if targeted != 0 {
+		t.Errorf("onEvent called %d times for a broadcast, want 0", targeted)
 	}
 }

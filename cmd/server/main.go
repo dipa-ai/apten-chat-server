@@ -80,7 +80,7 @@ func main() {
 			DB:       cfg.RedisDB,
 		})
 		defer rdb.Close()
-		broker := ws.NewBroker(rdb, cfg.InstanceID, hub.SendLocal)
+		broker := ws.NewBroker(rdb, cfg.InstanceID, hub.SendLocal, hub.BroadcastAllLocal)
 		hub.Broker = broker
 		go broker.Run(brokerCtx)
 		log.Printf("ws: redis bridge enabled (instance %q)", cfg.InstanceID)

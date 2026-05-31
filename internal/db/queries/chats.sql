@@ -81,6 +81,7 @@ SELECT
         FROM messages um
         WHERE um.chat_id = c.id
           AND um.sender_id <> $1
+          AND um.deleted_at IS NULL
           AND um.id > COALESCE((
               SELECT mr.last_read_msg_id
               FROM message_reads mr
