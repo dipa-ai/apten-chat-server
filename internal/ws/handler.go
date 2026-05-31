@@ -128,7 +128,7 @@ func (h *Handler) handleMessageSend(client *Client, payload json.RawMessage) {
 		SenderID:    fullMsg.SenderID,
 		SenderName:  fullMsg.SenderDisplayName,
 		Content:     content,
-		Attachments: []any{},
+		Attachments: []AttachmentPayload{},
 		CreatedAt:   fullMsg.CreatedAt.Time,
 		ClientID:    p.ClientID,
 	})

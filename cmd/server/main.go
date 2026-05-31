@@ -84,7 +84,7 @@ func main() {
 	inviteHandler := invite.NewHandler(inviteService)
 	chatHandler := chat.NewHandler(chatService, queries)
 	messageHandler := message.NewHandler(messageService, chatService, queries, hub)
-	fileHandler := files.NewHandler(fileService, chatService)
+	fileHandler := files.NewHandler(fileService, chatService, hub)
 	pushHandler := push.NewHandler(pushService, queries)
 	wsHandler := ws.NewHandler(hub, chatService, messageService, queries, cfg.JWTSecret)
 

@@ -1,7 +1,9 @@
 package files
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -11,13 +13,20 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Broadcaster delivers events to a set of users over WebSocket. It is satisfied
+// by *ws.Hub; declared here as an interface to avoid importing the ws package.
+type Broadcaster interface {
+	SendJSON(userIDs []int64, eventType string, payload any)
+}
+
 type Handler struct {
 	service     *Service
 	chatService *chat.Service
+	broadcaster Broadcaster
 }
 
-func NewHandler(service *Service, chatService *chat.Service) *Handler {
-	return &Handler{service: service, chatService: chatService}
+func NewHandler(service *Service, chatService *chat.Service, broadcaster Broadcaster) *Handler {
+	return &Handler{service: service, chatService: chatService, broadcaster: broadcaster}
 }
 
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +52,58 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+
+	h.broadcastUpload(r.Context(), chatID, claims.UserID, result)
+
 	writeJSON(w, http.StatusCreated, result)
+}
+
+// broadcastUpload emits a message.new event to every member of the chat so the
+// uploaded file message appears in real time for the sender and other members.
+// It is best-effort: failures are logged but never fail the upload response.
+func (h *Handler) broadcastUpload(ctx context.Context, chatID, senderID int64, result *UploadResult) {
+	if h.broadcaster == nil {
+		return
+	}
+	memberIDs, err := h.chatService.GetMemberIDs(ctx, chatID)
+	if err != nil {
+		log.Printf("files: broadcast get members: %v", err)
+		return
+	}
+	senderName, err := h.service.GetSenderDisplayName(ctx, senderID)
+	if err != nil {
+		log.Printf("files: broadcast get sender name: %v", err)
+		return
+	}
+
+	att := result.Attachment
+	var thumbnailPath *string
+	if att.ThumbnailPath.Valid {
+		thumbnailPath = &att.ThumbnailPath.String
+	}
+
+	h.broadcaster.SendJSON(memberIDs, "message.new", map[string]any{
+		"id":          result.Message.ID,
+		"chat_id":     result.Message.ChatID,
+		"sender_id":   result.Message.SenderID,
+		"sender_name": senderName,
+		"content":     nil,
+		"reply_to_id": nil,
+		"attachments": []map[string]any{
+			{
+				"id":             att.ID,
+				"message_id":     att.MessageID,
+				"file_name":      att.FileName,
+				"file_size":      att.FileSize,
+				"mime_type":      att.MimeType,
+				"storage_path":   att.StoragePath,
+				"thumbnail_path": thumbnailPath,
+				"created_at":     att.CreatedAt.Time,
+			},
+		},
+		"created_at": result.Message.CreatedAt.Time,
+		"client_id":  "",
+	})
 }
 
 // authorizeAttachment resolves the attachment and confirms the requesting user

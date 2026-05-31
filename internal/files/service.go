@@ -130,6 +130,15 @@ func (s *Service) GetThumbURLByPath(ctx context.Context, thumbnailPath string) (
 	return s.s3.PresignedGetURL(ctx, thumbnailPath, presignExpiry)
 }
 
+// GetSenderDisplayName returns a user's display name for labeling broadcasts.
+func (s *Service) GetSenderDisplayName(ctx context.Context, userID int64) (string, error) {
+	user, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return user.DisplayName, nil
+}
+
 func generateThumbnail(data []byte) ([]byte, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
