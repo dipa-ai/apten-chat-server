@@ -30,12 +30,13 @@ config:
   FILE_MAX_SIZE: "52428800"
   INVITE_TTL: "168h"
   VAPID_CONTACT: "mailto:zhivoysp@gmail.com"
-  # Cross-replica realtime bridge. Point REDIS_ADDR at a deployed Redis before
-  # raising replicaCount above 1, or events won't fan out across replicas.
-  REDIS_ADDR: "redis:6379"
+  # Cross-replica realtime bridge. Empty while replicaCount is 1 (no Redis
+  # deployed); set REDIS_ADDR to a reachable Redis before scaling above 1.
+  REDIS_ADDR: ""
   REDIS_DB: "0"
-  # WebSocket Origin allowlist (comma-separated). Leave empty to accept any.
-  WS_ALLOWED_ORIGINS: "https://chat.example.com"
+  # WebSocket Origin allowlist (comma-separated). Must list the exact scheme+host
+  # the browser loads from. Leave empty to accept any origin.
+  WS_ALLOWED_ORIGINS: "https://chat.apten.im"
 
 # Resources
 resources:

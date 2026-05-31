@@ -53,6 +53,9 @@ func NewHandler(hub *Hub, chatService *chat.Service, messageService *message.Ser
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Enforce the origin allowlist (when configured) before upgrading.
 	if len(h.allowedOrigins) > 0 && !originAllowed(r.Header.Get("Origin"), h.allowedOrigins) {
+		// Log the rejected origin: a 403 here is almost always a misconfigured
+		// WS_ALLOWED_ORIGINS that doesn't match the deployed scheme+host.
+		log.Printf("ws: rejected disallowed origin %q (allowed: %v)", r.Header.Get("Origin"), h.allowedOrigins)
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
