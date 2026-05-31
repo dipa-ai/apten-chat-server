@@ -41,6 +41,11 @@ type Querier interface {
 	ListAttachmentsByMessage(ctx context.Context, messageID int64) ([]Attachment, error)
 	ListAttachmentsByMessageIDs(ctx context.Context, dollar_1 []int64) ([]Attachment, error)
 	ListChatMembers(ctx context.Context, chatID int64) ([]ListChatMembersRow, error)
+	// The last message is resolved via a regular LEFT JOIN (not LATERAL): sqlc
+	// correctly infers nullable columns for a regular LEFT JOIN, but treats
+	// LATERAL-joined NOT NULL columns as non-null, which would fail to scan NULL
+	// for chats that have no messages. The direct counterpart and unread count use
+	// scalar subqueries, which sqlc always types as nullable.
 	ListChatsByUser(ctx context.Context, userID int64) ([]ListChatsByUserRow, error)
 	ListInvites(ctx context.Context) ([]Invite, error)
 	ListMessageReadsByChat(ctx context.Context, chatID int64) ([]MessageRead, error)
