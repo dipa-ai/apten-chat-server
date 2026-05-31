@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"sync"
@@ -12,6 +13,9 @@ type Hub struct {
 	mu         sync.RWMutex
 	Register   chan *Client
 	Unregister chan *Client
+
+	// Broker, when set, fans events out to other server replicas via Redis.
+	Broker *Broker
 
 	// OnDisconnect is called when a user's last connection is removed.
 	OnDisconnect func(userID int64)
@@ -76,11 +80,24 @@ func (h *Hub) Run() {
 	}
 }
 
-// Send sends an event to all connections for the given user IDs.
-// If a client's send buffer is full, the client is disconnected; the
-// read pump will then re-register after the client reconnects, forcing
-// a fresh sync instead of silently dropping real-time state.
+// Send delivers an event to the given users on this instance and, when a
+// broker is configured, publishes it to other replicas so their connections
+// for those users receive it too.
 func (h *Hub) Send(userIDs []int64, evt Event) {
+	h.SendLocal(userIDs, evt)
+	if h.Broker != nil {
+		h.Broker.Publish(context.Background(), userIDs, evt)
+	}
+}
+
+// SendLocal sends an event only to connections on this instance. The broker's
+// receive loop calls this (not Send) so events from other replicas are not
+// re-published, which would cause an infinite fan-out loop.
+//
+// If a client's send buffer is full, the client is disconnected; the read pump
+// will then re-register after the client reconnects, forcing a fresh sync
+// instead of silently dropping real-time state.
+func (h *Hub) SendLocal(userIDs []int64, evt Event) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for _, uid := range userIDs {

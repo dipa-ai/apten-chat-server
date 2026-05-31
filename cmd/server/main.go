@@ -24,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -66,6 +67,25 @@ func main() {
 	}
 	go hub.Run()
 
+	// Cross-replica realtime bridge (optional). When REDIS_ADDR is set, events
+	// are published to Redis Pub/Sub and events from other replicas are fanned
+	// out to this instance's local clients via SendLocal (never Send, which
+	// would re-publish and loop).
+	if cfg.RedisAddr != "" {
+		brokerCtx, cancelBroker := context.WithCancel(ctx)
+		defer cancelBroker()
+		rdb := redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+		defer rdb.Close()
+		broker := ws.NewBroker(rdb, cfg.InstanceID, hub.SendLocal)
+		hub.Broker = broker
+		go broker.Run(brokerCtx)
+		log.Printf("ws: redis bridge enabled (instance %q)", cfg.InstanceID)
+	}
+
 	// Services.
 	userService := user.NewService(pool, queries, cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 	inviteService := invite.NewService(queries, cfg.InviteTTL)
@@ -86,7 +106,7 @@ func main() {
 	messageHandler := message.NewHandler(messageService, chatService, queries, hub)
 	fileHandler := files.NewHandler(fileService, chatService, hub)
 	pushHandler := push.NewHandler(pushService, queries)
-	wsHandler := ws.NewHandler(hub, chatService, messageService, queries, cfg.JWTSecret)
+	wsHandler := ws.NewHandler(hub, chatService, messageService, queries, cfg.JWTSecret, cfg.WSAllowedOrigins)
 
 	// Router.
 	r := chi.NewRouter()

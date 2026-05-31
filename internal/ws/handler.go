@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/apten-chat/messenger/internal/message"
 	"github.com/coder/websocket"
 )
+
+// wsTokenPrefix marks the WebSocket subprotocol that carries the access token.
+// Browsers cannot set Authorization headers on WebSocket handshakes, so the
+// token rides in Sec-WebSocket-Protocol as "apten-chat.jwt.<token>" instead of
+// the URL (where it would leak into logs and history).
+const wsTokenPrefix = "apten-chat.jwt."
 
 type typingKey struct {
 	UserID int64
@@ -25,28 +32,37 @@ type Handler struct {
 	messageService *message.Service
 	queries        dbq.Querier
 	jwtSecret      string
+	allowedOrigins []string
 
 	typingTimers map[typingKey]*time.Timer
 	typingMu     sync.Mutex
 }
 
-func NewHandler(hub *Hub, chatService *chat.Service, messageService *message.Service, queries dbq.Querier, jwtSecret string) *Handler {
+func NewHandler(hub *Hub, chatService *chat.Service, messageService *message.Service, queries dbq.Querier, jwtSecret string, allowedOrigins []string) *Handler {
 	return &Handler{
 		hub:            hub,
 		chatService:    chatService,
 		messageService: messageService,
 		queries:        queries,
 		jwtSecret:      jwtSecret,
+		allowedOrigins: allowedOrigins,
 		typingTimers:   make(map[typingKey]*time.Timer),
 	}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.URL.Query().Get("token")
-	if tokenStr == "" {
+	// Enforce the origin allowlist (when configured) before upgrading.
+	if len(h.allowedOrigins) > 0 && !originAllowed(r.Header.Get("Origin"), h.allowedOrigins) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+
+	protocol := protocolFromRequest(r)
+	if protocol == "" {
 		http.Error(w, "missing token", http.StatusUnauthorized)
 		return
 	}
+	tokenStr := strings.TrimPrefix(protocol, wsTokenPrefix)
 
 	claims, err := auth.ParseAccessToken(h.jwtSecret, tokenStr)
 	if err != nil {
@@ -54,8 +70,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Echo the negotiated subprotocol back so the browser handshake succeeds.
+	// Origin is enforced above, so the built-in same-origin check is disabled
+	// (it would otherwise reject legitimate reverse-proxied deployments).
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // Allow any origin in dev.
+		InsecureSkipVerify: true,
+		Subprotocols:       []string{protocol},
 	})
 	if err != nil {
 		log.Printf("ws: accept error: %v", err)
@@ -223,4 +243,33 @@ func (h *Handler) broadcastTyping(userIDs []int64, chatID, userID int64, isTypin
 		IsTyping: isTyping,
 	})
 	h.hub.Send(userIDs, evt)
+}
+
+// protocolFromRequest returns the "apten-chat.jwt.<token>" subprotocol offered
+// by the client, or "" if none was offered. The Sec-WebSocket-Protocol header
+// may appear multiple times and/or as a single comma-separated value.
+func protocolFromRequest(r *http.Request) string {
+	for _, header := range r.Header.Values("Sec-WebSocket-Protocol") {
+		for _, p := range strings.Split(header, ",") {
+			p = strings.TrimSpace(p)
+			if strings.HasPrefix(p, wsTokenPrefix) {
+				return p
+			}
+		}
+	}
+	return ""
+}
+
+// originAllowed reports whether origin exactly matches one of the configured
+// allowed origins.
+func originAllowed(origin string, allowed []string) bool {
+	if origin == "" {
+		return false
+	}
+	for _, item := range allowed {
+		if origin == strings.TrimSpace(item) {
+			return true
+		}
+	}
+	return false
 }
