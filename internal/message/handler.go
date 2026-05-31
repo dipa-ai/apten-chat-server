@@ -114,7 +114,10 @@ func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg, err := h.queries.GetMessageByID(r.Context(), msgID)
-	if err != nil {
+	// Scope the message to the chat in the URL: membership was checked against
+	// chatID, so a message belonging to a different chat must not leak (its
+	// content or attachment metadata) even to a member of the URL's chat.
+	if err != nil || msg.ChatID != chatID {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "message not found"})
 		return
 	}

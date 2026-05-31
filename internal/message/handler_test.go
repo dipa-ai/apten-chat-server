@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/apten-chat/messenger/internal/auth"
@@ -147,5 +148,46 @@ func TestGetMessage_EmptyAttachmentsArray(t *testing.T) {
 	}
 	if len(atts) != 0 {
 		t.Errorf("attachments = %d, want 0", len(atts))
+	}
+}
+
+// A member of the URL's chat must not be able to read a message (or its
+// attachment metadata) that belongs to a different chat.
+func TestGetMessage_CrossChatDenied(t *testing.T) {
+	attachmentsLoaded := false
+	mock := &testutil.MockQuerier{
+		IsChatMemberFunc: func(ctx context.Context, arg dbq.IsChatMemberParams) (bool, error) {
+			return true, nil // user is a member of chat 7 (the URL chat)
+		},
+		GetMessageByIDFunc: func(ctx context.Context, id int64) (dbq.GetMessageByIDRow, error) {
+			// Message 200 actually belongs to chat 99, not 7.
+			return dbq.GetMessageByIDRow{
+				ID:                200,
+				ChatID:            99,
+				SenderID:          42,
+				SenderDisplayName: "Mallory",
+				Content:           pgtype.Text{String: "secret", Valid: true},
+			}, nil
+		},
+		ListAttachmentsByMessageIDsFunc: func(ctx context.Context, ids []int64) ([]dbq.Attachment, error) {
+			attachmentsLoaded = true
+			return []dbq.Attachment{{ID: 55, MessageID: 200, FileName: "secret.pdf"}}, nil
+		},
+	}
+	h := NewHandler(nil, chat.NewServiceWithDeps(mock, nil, nil), mock, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/chats/7/messages/200", nil).
+		WithContext(reqCtx(10, map[string]string{"id": "7", "mid": "200"}))
+	rec := httptest.NewRecorder()
+	h.GetMessage(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+	if attachmentsLoaded {
+		t.Error("attachments were loaded for a cross-chat message; metadata may leak")
+	}
+	if body := rec.Body.String(); strings.Contains(body, "secret") || strings.Contains(body, "55") {
+		t.Errorf("response leaked cross-chat content: %s", body)
 	}
 }
