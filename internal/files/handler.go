@@ -136,7 +136,10 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
-	http.Redirect(w, r, url, http.StatusFound)
+	// Return the presigned URL as JSON rather than a 302 redirect: the frontend
+	// fetches this with its bearer token and then loads the URL directly in an
+	// <img>/<a>, which works cross-origin without storage CORS configuration.
+	writeJSON(w, http.StatusOK, map[string]string{"url": url})
 }
 
 func (h *Handler) Thumbnail(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +160,7 @@ func (h *Handler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
-	http.Redirect(w, r, url, http.StatusFound)
+	writeJSON(w, http.StatusOK, map[string]string{"url": url})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
