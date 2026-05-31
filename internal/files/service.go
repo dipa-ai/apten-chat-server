@@ -113,27 +113,30 @@ func (s *Service) Upload(ctx context.Context, chatID, senderID int64, fileName s
 	return &UploadResult{Message: msg, Attachment: att}, nil
 }
 
-func (s *Service) GetFileURL(ctx context.Context, fileID int64) (string, error) {
-	att, err := s.queries.GetAttachmentByID(ctx, fileID)
+// GetAttachmentAccessContext returns the attachment along with its owning
+// chat ID so callers can authorize access by chat membership.
+func (s *Service) GetAttachmentAccessContext(ctx context.Context, fileID int64) (dbq.GetAttachmentAccessContextRow, error) {
+	return s.queries.GetAttachmentAccessContext(ctx, fileID)
+}
+
+// GetFileURLByPath presigns a download URL for an already-resolved storage
+// path, avoiding a second attachment lookup after authorization.
+func (s *Service) GetFileURLByPath(ctx context.Context, storagePath string) (string, error) {
+	return s.s3.PresignedGetURL(ctx, storagePath, presignExpiry)
+}
+
+// GetThumbURLByPath presigns a thumbnail URL for an already-resolved path.
+func (s *Service) GetThumbURLByPath(ctx context.Context, thumbnailPath string) (string, error) {
+	return s.s3.PresignedGetURL(ctx, thumbnailPath, presignExpiry)
+}
+
+// GetSenderDisplayName returns a user's display name for labeling broadcasts.
+func (s *Service) GetSenderDisplayName(ctx context.Context, userID int64) (string, error) {
+	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
-	return s.s3.PresignedGetURL(ctx, att.StoragePath, presignExpiry)
-}
-
-func (s *Service) GetThumbURL(ctx context.Context, fileID int64) (string, error) {
-	att, err := s.queries.GetAttachmentByID(ctx, fileID)
-	if err != nil {
-		return "", err
-	}
-	if !att.ThumbnailPath.Valid {
-		return "", fmt.Errorf("no thumbnail available")
-	}
-	return s.s3.PresignedGetURL(ctx, att.ThumbnailPath.String, presignExpiry)
-}
-
-func (s *Service) GetAttachment(ctx context.Context, fileID int64) (dbq.Attachment, error) {
-	return s.queries.GetAttachmentByID(ctx, fileID)
+	return user.DisplayName, nil
 }
 
 func generateThumbnail(data []byte) ([]byte, error) {

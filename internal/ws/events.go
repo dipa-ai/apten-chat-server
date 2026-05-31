@@ -31,16 +31,29 @@ type MessageReadPayload struct {
 
 // Server → Client payloads
 
+// AttachmentPayload is the concrete shape of an attachment carried by a
+// message.new event. It mirrors the frontend Attachment type.
+type AttachmentPayload struct {
+	ID            int64     `json:"id"`
+	MessageID     int64     `json:"message_id"`
+	FileName      string    `json:"file_name"`
+	FileSize      int64     `json:"file_size"`
+	MimeType      string    `json:"mime_type"`
+	StoragePath   string    `json:"storage_path"`
+	ThumbnailPath *string   `json:"thumbnail_path"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type MessageNewPayload struct {
-	ID          int64      `json:"id"`
-	ChatID      int64      `json:"chat_id"`
-	SenderID    int64      `json:"sender_id"`
-	SenderName  string     `json:"sender_name"`
-	Content     *string    `json:"content"`
-	ReplyToID   *int64     `json:"reply_to_id,omitempty"`
-	Attachments []any      `json:"attachments"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ClientID    string     `json:"client_id,omitempty"`
+	ID          int64               `json:"id"`
+	ChatID      int64               `json:"chat_id"`
+	SenderID    int64               `json:"sender_id"`
+	SenderName  string              `json:"sender_name"`
+	Content     *string             `json:"content"`
+	ReplyToID   *int64              `json:"reply_to_id,omitempty"`
+	Attachments []AttachmentPayload `json:"attachments"`
+	CreatedAt   time.Time           `json:"created_at"`
+	ClientID    string              `json:"client_id,omitempty"`
 }
 
 type MessageAckPayload struct {

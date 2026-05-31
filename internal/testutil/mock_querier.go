@@ -27,6 +27,7 @@ type MockQuerier struct {
 	DeleteRefreshTokenFunc         func(ctx context.Context, tokenHash string) error
 	DeleteUserRefreshTokensFunc    func(ctx context.Context, userID pgtype.Int8) error
 	FindDirectChatFunc             func(ctx context.Context, arg dbq.FindDirectChatParams) (int64, error)
+	GetAttachmentAccessContextFunc func(ctx context.Context, id int64) (dbq.GetAttachmentAccessContextRow, error)
 	GetAttachmentByIDFunc          func(ctx context.Context, id int64) (dbq.Attachment, error)
 	GetChatByIDFunc                func(ctx context.Context, id int64) (dbq.Chat, error)
 	GetInviteByCodeFunc            func(ctx context.Context, code string) (dbq.Invite, error)
@@ -37,6 +38,7 @@ type MockQuerier struct {
 	GetUserByUsernameFunc          func(ctx context.Context, username string) (dbq.User, error)
 	IsChatMemberFunc               func(ctx context.Context, arg dbq.IsChatMemberParams) (bool, error)
 	ListAttachmentsByMessageFunc   func(ctx context.Context, messageID int64) ([]dbq.Attachment, error)
+	ListAttachmentsByMessageIDsFunc func(ctx context.Context, messageIDs []int64) ([]dbq.Attachment, error)
 	ListChatMembersFunc            func(ctx context.Context, chatID int64) ([]dbq.ListChatMembersRow, error)
 	ListChatsByUserFunc            func(ctx context.Context, userID int64) ([]dbq.ListChatsByUserRow, error)
 	ListInvitesFunc                func(ctx context.Context) ([]dbq.Invite, error)
@@ -176,6 +178,13 @@ func (m *MockQuerier) FindDirectChat(ctx context.Context, arg dbq.FindDirectChat
 	return 0, nil
 }
 
+func (m *MockQuerier) GetAttachmentAccessContext(ctx context.Context, id int64) (dbq.GetAttachmentAccessContextRow, error) {
+	if m.GetAttachmentAccessContextFunc != nil {
+		return m.GetAttachmentAccessContextFunc(ctx, id)
+	}
+	return dbq.GetAttachmentAccessContextRow{}, nil
+}
+
 func (m *MockQuerier) GetAttachmentByID(ctx context.Context, id int64) (dbq.Attachment, error) {
 	if m.GetAttachmentByIDFunc != nil {
 		return m.GetAttachmentByIDFunc(ctx, id)
@@ -242,6 +251,13 @@ func (m *MockQuerier) IsChatMember(ctx context.Context, arg dbq.IsChatMemberPara
 func (m *MockQuerier) ListAttachmentsByMessage(ctx context.Context, messageID int64) ([]dbq.Attachment, error) {
 	if m.ListAttachmentsByMessageFunc != nil {
 		return m.ListAttachmentsByMessageFunc(ctx, messageID)
+	}
+	return []dbq.Attachment{}, nil
+}
+
+func (m *MockQuerier) ListAttachmentsByMessageIDs(ctx context.Context, messageIDs []int64) ([]dbq.Attachment, error) {
+	if m.ListAttachmentsByMessageIDsFunc != nil {
+		return m.ListAttachmentsByMessageIDsFunc(ctx, messageIDs)
 	}
 	return []dbq.Attachment{}, nil
 }
