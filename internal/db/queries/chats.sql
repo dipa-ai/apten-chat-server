@@ -42,13 +42,57 @@ JOIN chats c ON c.id = cm1.chat_id
 WHERE cm1.user_id = $1 AND cm2.user_id = $2 AND c.type = 'direct';
 
 -- name: ListChatsByUser :many
-SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.created_at,
-       lm.id AS last_message_id, lm.content AS last_message_content,
-       lm.sender_id AS last_message_sender_id, lm.created_at AS last_message_at
+-- The last message is resolved via a regular LEFT JOIN (not LATERAL): sqlc
+-- correctly infers nullable columns for a regular LEFT JOIN, but treats
+-- LATERAL-joined NOT NULL columns as non-null, which would fail to scan NULL
+-- for chats that have no messages. The direct counterpart and unread count use
+-- scalar subqueries, which sqlc always types as nullable.
+SELECT
+    c.id,
+    c.type,
+    c.name,
+    c.avatar_url,
+    c.created_by,
+    c.created_at,
+    COALESCE(lm.created_at, c.created_at)::timestamptz AS updated_at,
+    lm.id AS last_message_id,
+    lm.content AS last_message_content,
+    lm.sender_id AS last_message_sender_id,
+    lmu.display_name AS last_message_sender_display_name,
+    lm.deleted_at AS last_message_deleted_at,
+    COALESCE((
+        SELECT u.display_name
+        FROM chat_members cm2
+        JOIN users u ON u.id = cm2.user_id
+        WHERE cm2.chat_id = c.id AND cm2.user_id <> $1 AND c.type = 'direct'
+        ORDER BY cm2.joined_at
+        LIMIT 1
+    ), '')::text AS direct_display_name,
+    (
+        SELECT u.avatar_url
+        FROM chat_members cm2
+        JOIN users u ON u.id = cm2.user_id
+        WHERE cm2.chat_id = c.id AND cm2.user_id <> $1 AND c.type = 'direct'
+        ORDER BY cm2.joined_at
+        LIMIT 1
+    ) AS direct_avatar_url,
+    COALESCE((
+        SELECT count(*)
+        FROM messages um
+        WHERE um.chat_id = c.id
+          AND um.sender_id <> $1
+          AND um.deleted_at IS NULL
+          AND um.id > COALESCE((
+              SELECT mr.last_read_msg_id
+              FROM message_reads mr
+              WHERE mr.chat_id = c.id AND mr.user_id = $1
+          ), 0)
+    ), 0)::bigint AS unread_count
 FROM chat_members cm
 JOIN chats c ON c.id = cm.chat_id
 LEFT JOIN messages lm ON lm.id = (
-    SELECT id FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1
+    SELECT m.id FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1
 )
+LEFT JOIN users lmu ON lmu.id = lm.sender_id
 WHERE cm.user_id = $1
-ORDER BY COALESCE(lm.created_at, c.created_at) DESC;
+ORDER BY COALESCE(lm.created_at, c.created_at) DESC, c.id DESC;

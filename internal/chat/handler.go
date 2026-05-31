@@ -52,7 +52,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
-	writeJSON(w, http.StatusOK, chats)
+	dtos := make([]ChatListItemDTO, len(chats))
+	for i, c := range chats {
+		dtos[i] = chatListItemDTO(c)
+	}
+	writeJSON(w, http.StatusOK, dtos)
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {

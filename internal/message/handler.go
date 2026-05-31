@@ -73,7 +73,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		dtos := make([]MessageDTO, len(msgs))
 		for i, m := range msgs {
-			dtos[i] = buildMessageDTO(m.ID, m.ChatID, m.SenderID, m.SenderUsername, m.SenderDisplayName, m.Content, m.ReplyToID, m.CreatedAt, m.UpdatedAt, attMap[m.ID])
+			dtos[i] = buildMessageDTO(m.ID, m.ChatID, m.SenderID, m.SenderUsername, m.SenderDisplayName, m.Content, m.ReplyToID, m.CreatedAt, m.UpdatedAt, m.DeletedAt, attMap[m.ID])
 		}
 		writeJSON(w, http.StatusOK, dtos)
 		return
@@ -98,7 +98,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	dtos := make([]MessageDTO, len(msgs))
 	for i, m := range msgs {
-		dtos[i] = buildMessageDTO(m.ID, m.ChatID, m.SenderID, m.SenderUsername, m.SenderDisplayName, m.Content, m.ReplyToID, m.CreatedAt, m.UpdatedAt, attMap[m.ID])
+		dtos[i] = buildMessageDTO(m.ID, m.ChatID, m.SenderID, m.SenderUsername, m.SenderDisplayName, m.Content, m.ReplyToID, m.CreatedAt, m.UpdatedAt, m.DeletedAt, attMap[m.ID])
 	}
 	writeJSON(w, http.StatusOK, dtos)
 }
@@ -126,7 +126,7 @@ func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
-	dto := buildMessageDTO(msg.ID, msg.ChatID, msg.SenderID, msg.SenderUsername, msg.SenderDisplayName, msg.Content, msg.ReplyToID, msg.CreatedAt, msg.UpdatedAt, attMap[msg.ID])
+	dto := buildMessageDTO(msg.ID, msg.ChatID, msg.SenderID, msg.SenderUsername, msg.SenderDisplayName, msg.Content, msg.ReplyToID, msg.CreatedAt, msg.UpdatedAt, msg.DeletedAt, attMap[msg.ID])
 	writeJSON(w, http.StatusOK, dto)
 }
 
@@ -181,7 +181,15 @@ func (h *Handler) EditMessage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, updated)
+	// Return the edited message as a DTO. The sender's name comes from the
+	// pre-edit row (msg); the rest comes from the updated row.
+	attMap, err := h.attachmentsByMessageID(r.Context(), []int64{updated.ID})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		return
+	}
+	dto := buildMessageDTO(updated.ID, updated.ChatID, updated.SenderID, msg.SenderUsername, msg.SenderDisplayName, updated.Content, updated.ReplyToID, updated.CreatedAt, updated.UpdatedAt, updated.DeletedAt, attMap[updated.ID])
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {

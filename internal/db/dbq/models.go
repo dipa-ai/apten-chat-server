@@ -53,6 +53,7 @@ type Message struct {
 	ReplyToID pgtype.Int8        `json:"reply_to_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type MessageRead struct {

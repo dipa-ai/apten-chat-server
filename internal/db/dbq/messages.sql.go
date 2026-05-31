@@ -14,7 +14,7 @@ import (
 const createMessage = `-- name: CreateMessage :one
 INSERT INTO messages (chat_id, sender_id, content, reply_to_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at
+RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at, deleted_at
 `
 
 type CreateMessageParams struct {
@@ -40,12 +40,13 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.ReplyToID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getMessageByID = `-- name: GetMessageByID :one
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
@@ -60,6 +61,7 @@ type GetMessageByIDRow struct {
 	ReplyToID         pgtype.Int8        `json:"reply_to_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 	SenderUsername    string             `json:"sender_username"`
 	SenderDisplayName string             `json:"sender_display_name"`
 }
@@ -75,6 +77,7 @@ func (q *Queries) GetMessageByID(ctx context.Context, id int64) (GetMessageByIDR
 		&i.ReplyToID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 		&i.SenderUsername,
 		&i.SenderDisplayName,
 	)
@@ -82,7 +85,7 @@ func (q *Queries) GetMessageByID(ctx context.Context, id int64) (GetMessageByIDR
 }
 
 const listMessagesByChatBefore = `-- name: ListMessagesByChatBefore :many
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
@@ -108,6 +111,7 @@ type ListMessagesByChatBeforeRow struct {
 	ReplyToID         pgtype.Int8        `json:"reply_to_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 	SenderUsername    string             `json:"sender_username"`
 	SenderDisplayName string             `json:"sender_display_name"`
 }
@@ -129,6 +133,7 @@ func (q *Queries) ListMessagesByChatBefore(ctx context.Context, arg ListMessages
 			&i.ReplyToID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 			&i.SenderUsername,
 			&i.SenderDisplayName,
 		); err != nil {
@@ -143,7 +148,7 @@ func (q *Queries) ListMessagesByChatBefore(ctx context.Context, arg ListMessages
 }
 
 const listMessagesByChatLatest = `-- name: ListMessagesByChatLatest :many
-SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at,
+SELECT m.id, m.chat_id, m.sender_id, m.content, m.reply_to_id, m.created_at, m.updated_at, m.deleted_at,
        u.username AS sender_username, u.display_name AS sender_display_name
 FROM messages m
 JOIN users u ON u.id = m.sender_id
@@ -165,6 +170,7 @@ type ListMessagesByChatLatestRow struct {
 	ReplyToID         pgtype.Int8        `json:"reply_to_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 	SenderUsername    string             `json:"sender_username"`
 	SenderDisplayName string             `json:"sender_display_name"`
 }
@@ -186,6 +192,7 @@ func (q *Queries) ListMessagesByChatLatest(ctx context.Context, arg ListMessages
 			&i.ReplyToID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 			&i.SenderUsername,
 			&i.SenderDisplayName,
 		); err != nil {
@@ -200,7 +207,11 @@ func (q *Queries) ListMessagesByChatLatest(ctx context.Context, arg ListMessages
 }
 
 const softDeleteMessage = `-- name: SoftDeleteMessage :exec
-UPDATE messages SET content = NULL, updated_at = now() WHERE id = $1
+UPDATE messages
+SET content = NULL,
+    deleted_at = now(),
+    updated_at = now()
+WHERE id = $1
 `
 
 func (q *Queries) SoftDeleteMessage(ctx context.Context, id int64) error {
@@ -212,7 +223,7 @@ const updateMessageContent = `-- name: UpdateMessageContent :one
 UPDATE messages
 SET content = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at
+RETURNING id, chat_id, sender_id, content, reply_to_id, created_at, updated_at, deleted_at
 `
 
 type UpdateMessageContentParams struct {
@@ -231,6 +242,7 @@ func (q *Queries) UpdateMessageContent(ctx context.Context, arg UpdateMessageCon
 		&i.ReplyToID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
